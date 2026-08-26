@@ -39,7 +39,43 @@ const formatDuration = (totalHours) => {
 };
 
 export const calculateSummary = (employee, monthNumber = 11, year = new Date().getFullYear()) => {
-  if (!employee || !employee.attendance) return getEmptySummary();
+  if (!employee) return getEmptySummary();
+
+  // 1. Direct summary support for uploaded summary sheets or calculated records
+  const totalWorkingDays = Number(employee.totalWorkingDays || employee.workingDays || employee.summary?.workingDays || employee['Total Working Days'] || employee['Total Days']) || 24;
+  const directPresent = employee.finalCalculatedPresent !== undefined 
+    ? Number(employee.finalCalculatedPresent)
+    : employee.biometricPresent !== undefined
+      ? Number(employee.biometricPresent)
+      : employee.presentDays !== undefined
+        ? Number(employee.presentDays)
+        : employee.summary?.presentDays !== undefined
+          ? Number(employee.summary.presentDays)
+          : null;
+
+  if (directPresent !== null && (!employee.attendance || !Array.isArray(employee.attendance) || employee.attendance.length === 0)) {
+    const presentDays = Math.min(totalWorkingDays, directPresent);
+    const absentDays = Math.max(0, totalWorkingDays - presentDays);
+    const attendancePercentage = totalWorkingDays > 0 ? (presentDays / totalWorkingDays) * 100 : 0;
+    const totalHours = presentDays * 8.0;
+
+    return {
+      presentDays,
+      absentDays,
+      totalDays: totalWorkingDays,
+      workingDays: totalWorkingDays,
+      holidays: 0,
+      effectiveDays: totalWorkingDays,
+      totalHours: parseFloat(totalHours.toFixed(2)),
+      averageHoursPerDay: presentDays > 0 ? parseFloat((totalHours / presentDays).toFixed(1)) : 8.0,
+      formattedDuration: formatDuration(totalHours),
+      attendancePercentage: parseFloat(attendancePercentage.toFixed(1))
+    };
+  }
+
+  if (!employee.attendance || !Array.isArray(employee.attendance) || employee.attendance.length === 0) {
+    return getEmptySummary();
+  }
 
   const totalDays = employee.attendance.length;
   // Get holidays for this specific month/year from config
@@ -48,7 +84,7 @@ export const calculateSummary = (employee, monthNumber = 11, year = new Date().g
   const holidayCount = holidaySet.size;
 
   // Working days as per requirement: total_days - holiday count from config
-  const workingDaysCount = totalDays - holidayCount;
+  const workingDaysCount = Math.max(1, totalDays - holidayCount);
 
   let presentDays = 0;
   let absentDays = 0;
@@ -56,15 +92,15 @@ export const calculateSummary = (employee, monthNumber = 11, year = new Date().g
 
   employee.attendance.forEach((record, index) => {
     const day = index + 1;
-    const status = record.status?.trim() || '';
+    const status = (record.status || '').toString().trim().toUpperCase();
 
     // If it's a holiday in the config, we don't count it as P or A for this formula
     if (holidaySet.has(day)) {
       return;
     }
 
-    // It's a working day
-    if (status === 'P') {
+    // Working day: 'P', 'OD', 'AL', 'PRESENT' are counted as Present
+    if (['P', 'OD', 'AL', 'PRESENT'].includes(status)) {
       presentDays++;
       if (record.hours && record.hours > 0) {
         totalHours += record.hours;
@@ -73,18 +109,27 @@ export const calculateSummary = (employee, monthNumber = 11, year = new Date().g
       } else if (record.inTime && record.outTime) {
         totalHours += estimateHoursFromTimes(record.inTime, record.outTime);
       } else {
+        // Standard 8 hours for present/duty days
         totalHours += 8.0;
       }
     } else {
-      // Anything other than 'P' on a working day (including 'A', 'L', or empty) is counted as Absent
-      // to satisfy the requirement: Present + Absent + Holidays = Total
       absentDays++;
     }
   });
 
+  // Fallback to direct present count if higher
+  if (directPresent !== null && directPresent > presentDays) {
+    presentDays = Math.min(workingDaysCount, directPresent);
+    absentDays = Math.max(0, workingDaysCount - presentDays);
+    if (totalHours === 0) {
+      totalHours = presentDays * 8.0;
+    }
+  }
+
   // Attendance Percentage = (Present Days / Working Days) * 100
   const attendancePercentage = workingDaysCount > 0 ? (presentDays / workingDaysCount) * 100 : 0;
   const totalHoursFormatted = parseFloat(totalHours.toFixed(2));
+  const averageHoursPerDay = presentDays > 0 ? parseFloat((totalHours / presentDays).toFixed(1)) : 0;
 
   return {
     presentDays,
@@ -94,6 +139,7 @@ export const calculateSummary = (employee, monthNumber = 11, year = new Date().g
     holidays: holidayCount,
     effectiveDays: presentDays + absentDays,
     totalHours: totalHoursFormatted,
+    averageHoursPerDay,
     formattedDuration: formatDuration(totalHours),
     attendancePercentage: parseFloat(attendancePercentage.toFixed(1))
   };

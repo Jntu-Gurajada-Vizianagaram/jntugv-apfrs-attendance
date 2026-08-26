@@ -5,27 +5,17 @@ export const persons = [
     cfms_id: "14406143",
     email: "aee@gmail.com",
     designation: "Assistant Engineer",
-    department: "CIVIL",
-    mobile: "8008484236",
-    job_status: "AEE"
-  },
-  {
-    id: 1,
-    name: "Sri.L.Hari Prakash",
-    cfms_id: "14406143",
-    email: "aee@gmail.com",
-    designation: "Assistant Engineer",
-    department: "CIVIL",
+    department: "Engineering Section",
     mobile: "8008484236",
     job_status: "AEE"
   },
   {
     id: 2,
     name: "Vemuri KrishnaAnila",
-    cfms_id: "1009385182",
-    email: "vkaneela.maths@gmail.com",
+    cfms_id: "15071465",
+    email: "vkaneela.maths@jntugvcev.edu.in",
     designation: "Assistant Professor",
-    department: "Math",
+    department: "BS&HSS",
     mobile: "9704117814",
     job_status: "contract"
   },
@@ -33,7 +23,7 @@ export const persons = [
     id: 3,
     name: "Sri.K.Srinivasa Rao",
     cfms_id: "15081908",
-    email: "admins@jntugbcev.edu.in",
+    email: "admins@jntugv.edu.in",
     designation: "SA",
     department: "Administration",
     mobile: "9247739489",
@@ -44,7 +34,7 @@ export const persons = [
     name: "B.Tirumula Rao",
     cfms_id: "1000218038",
     email: "btirimula.it@jntugvcev.edu.in",
-    designation: "Assistant Professor",
+    designation: "Associate Professor",
     department: "IT",
     mobile: "8374033622",
     job_status: "Regular"
@@ -64,7 +54,7 @@ export const persons = [
     name: "Ch. Bindu Madhuri",
     cfms_id: "1000218016",
     email: "chbmadhuri.it@jntugvcev.edu.in",
-    designation: "Assistant Professor",
+    designation: "Associate Professor",
     department: "IT",
     mobile: "9704955762",
     job_status: "Regular"
@@ -114,7 +104,7 @@ export const persons = [
     name: "B. Nalini",
     cfms_id: "1000218101",
     email: "nalinib.ece@jntugvcev.edu.in",
-    designation: "Assistant Professor",
+    designation: "Associate Professor",
     department: "ECE",
     mobile: "9912609545",
     job_status: "Regular"
@@ -174,7 +164,7 @@ export const persons = [
     name: "P. Aruna Kumari",
     cfms_id: "1000218022",
     email: "arunakumarip.cse@jntugvcev.edu.in",
-    designation: "Assistant Professor",
+    designation: "Associate Professor",
     department: "CSE",
     mobile: "9440520606",
     job_status: "Regular"
@@ -192,7 +182,7 @@ export const persons = [
   {
     id: 19,
     name: "R. Rajeswara Rao",
-    cfms_id: "1000218133",
+    cfms_id: "",
     email: "raob4u.cse@jntugvcev.edu.in",
     designation: "Professor",
     department: "CSE",
@@ -224,7 +214,7 @@ export const persons = [
     name: "Dr. C. Neelima Devi",
     cfms_id: "1000218099",
     email: "cneelima.me@jntugvcev.edu.in",
-    designation: "Assistant Professor",
+    designation: "Associate Professor",
     department: "ME",
     mobile: "9849965809",
     job_status: "Regular"
@@ -263,7 +253,7 @@ export const persons = [
     id: 26,
     name: "K. Sri Kumar",
     cfms_id: "1000217981",
-    email: "",
+    email: "kotni.eee@jntugvcev.edu.in",
     designation: "Professor",
     department: "EEE",
     mobile: "8331953650",
@@ -545,14 +535,14 @@ export const persons = [
     cfms_id: "1009385160",
     email: "kvraju.ece@jntugvcev.edu.in",
     designation: "Asst.prof",
-    department: "ece",
+    department: "ECE",
     mobile: "9703481843",
     job_status: "contract"
   },
   {
     id: 55,
     name: "Nammi SureshKumar",
-    cfms_id: "1009385159",
+    cfms_id: "1009495921",
     email: "sureshnammi.eng@jntugvcev.edu.in",
     designation: "Asst.Prof. (Contract)",
     department: "BS&HSS",
@@ -725,7 +715,7 @@ export const persons = [
     cfms_id: "",
     email: "paparao.maths@jntugvcev.edu.in",
     designation: "Professor",
-    department: "Maths",
+    department: "BS&HSS",
     mobile: "",
     job_status: "Regular"
   },
@@ -735,7 +725,7 @@ export const persons = [
     cfms_id: "",
     email: "tsnmurthy.ece@jntugvcev.edu.in",
     designation: "Professor",
-    department: "ece",
+    department: "ECE",
     mobile: "",
     job_status: "Regular"
   },
@@ -745,7 +735,7 @@ export const persons = [
     cfms_id: "",
     email: "vali.maths@jntugvcev.edu.in",
     designation: "Professor",
-    department: "Maths",
+    department: "BS&HSS",
     mobile: "9963001596",
     job_status: "Regular"
   },
@@ -775,7 +765,7 @@ export const persons = [
     cfms_id: "1009385221",
     email: "sahu.eee@jntugvcev.edu.in",
     designation: "Asst.Professor",
-    department: "eee",
+    department: "EEE",
     mobile: "8801100258",
     job_status: "Contract"
   },
@@ -785,7 +775,7 @@ export const persons = [
     cfms_id: "1009385146",
     email: "santharaorelli.eng@jntugvcev.edu.in",
     designation: "Asst.Professor",
-    department: "eng",
+    department: "BS&HSS",
     mobile: "9603891774",
     job_status: "contract"
   },
@@ -797,17 +787,16 @@ export const persons = [
     designation: "Asst.Professor",
     department: "MET",
     mobile: "",
-     job_status: "contract"
+    job_status: "contract"
   },
   {
     id: 80,
-    name: "vemuri Krishna Aneela",
-    cfms_id: "15071465",
-    email: "vkaneela.maths@jntugvcev.edu.in",
+    name: "Suresh Kumar Nammi",
+    cfms_id: "1009385159",
+    email: "sureshnammi.eng@jntugvcev.edu.in",
     designation: "Asst.Professor",
-    department: "Maths",
-    mobile: "9704117814",
+    department: "BS&HSS",
+    mobile: "9441567983",
     job_status: "contract"
-  } ,
-  
+  }
 ];

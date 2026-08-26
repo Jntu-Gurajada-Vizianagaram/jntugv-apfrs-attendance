@@ -109,7 +109,10 @@ const DailyReport = () => {
                 if (!a.isPresent && b.isPresent) return 1;
                 if (a.isAbsent && !b.isAbsent) return -1;
                 if (!a.isAbsent && b.isAbsent) return 1;
-                return a.name.localeCompare(b.name);
+                
+                const nameA = a.name || a.facultyName || '';
+                const nameB = b.name || b.facultyName || '';
+                return nameA.localeCompare(nameB);
             });
     }, [attendanceData, selectedDay, selectedDepartment]);
 
@@ -394,8 +397,8 @@ const DailyReport = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {dailyAttendance.map((emp) => (
-                                <tr key={emp.cfmsId} className="hover:bg-slate-50">
+                            {dailyAttendance.map((emp, index) => (
+                                <tr key={`${emp.cfmsId}-${index}`} className="hover:bg-slate-50">
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-slate-900">{emp.name}</div>
                                         <div className="text-sm text-slate-500">{emp.cfmsId}</div>

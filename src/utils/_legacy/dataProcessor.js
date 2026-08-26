@@ -162,6 +162,19 @@ export const processAttendanceData = (rawData, monthNumber = null, year = new Da
       const holidayLabel = getHolidayLabel(actualMonth, day, year);
       const holidayType = getHolidayType(actualMonth, day, year);
 
+      const dateObj = new Date(year, actualMonth - 1, day);
+      const isSunday = dateObj.getDay() === 0;
+      let isSecondSaturday = false;
+      if (dateObj.getDay() === 6) {
+        let saturdayCount = 0;
+        for (let d = 1; d <= day; d++) {
+          if (new Date(year, actualMonth - 1, d).getDay() === 6) {
+            saturdayCount++;
+          }
+        }
+        isSecondSaturday = saturdayCount === 2;
+      }
+
       if (baseCol !== -1 && baseCol + 3 < row.length) {
         const inTime = formatTime(row[baseCol]);
         const outTime = formatTime(row[baseCol + 1]);
@@ -170,20 +183,42 @@ export const processAttendanceData = (rawData, monthNumber = null, year = new Da
 
         // Determine final status based on calendar configuration
         let finalStatus;
-        if (holidayLabel) {
+        if (holidayType === 'general' || holidayType === 'public') {
+          finalStatus = 'H';
+        } else if (isSunday || isSecondSaturday) {
+          if (rawStatus === 'P') {
+            finalStatus = 'P';
+          } else {
+            finalStatus = isSunday ? 'Weekend' : 'SS';
+          }
+        } else if (holidayType === 'optional') {
+          let allAbsent = true;
+          for (let r = 1; r < rawData.length; r++) {
+            const checkRow = rawData[r];
+            if (!checkRow || checkRow.length <= baseCol + 2) continue;
+            if (!checkRow[0] && !checkRow[2]) continue;
+            const checkStatus = (checkRow[baseCol + 2] || '').toString().trim();
+            if (checkStatus === 'P') {
+              allAbsent = false;
+              break;
+            }
+          }
+          if (allAbsent && (rawStatus === 'A' || !rawStatus)) {
+            finalStatus = 'OH';
+          } else {
+            finalStatus = (rawStatus === 'P' || rawStatus === 'A') ? rawStatus : holidayLabel;
+          }
+        } else if (holidayLabel) {
           // If it's a holiday/weekend/second Saturday, check if they actually attended
           if (rawStatus === 'P') {
             // They came to work on a holiday - mark as Present
             finalStatus = 'P';
-          } else if (rawStatus === 'A') {
-            // They were marked absent on a holiday (unusual but possible)
-            finalStatus = 'A';
           } else {
             // No attendance data - show the holiday label
             if (holidayType === 'sunday') {
               finalStatus = 'Weekend';
             } else if (holidayType === 'second_saturday') {
-              finalStatus = 'Second Saturday';
+              finalStatus = 'SS';
             } else {
               finalStatus = holidayLabel; // e.g., "Republic Day", "Diwali"
             }

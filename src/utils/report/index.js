@@ -158,18 +158,18 @@ const createIndividualDocument = (data) => {
     yPos += 10;
 
     const attendanceData = employee.attendance.map((day) => {
-        const statusLabel = formatAttendanceStatus(day, month, year);
-        const hasDuration = day.duration && day.duration.trim().length > 0;
-        const hoursLabel = day.hours ? `${formatNumber(day.hours, 1)} hrs` : '-';
+      const statusLabel = formatAttendanceStatus(day, month, year);
+      const hasDuration = day.duration && day.duration.trim().length > 0;
+      const hoursLabel = day.hours ? `${formatNumber(day.hours, 1)} hrs` : '-';
 
-        return [
-          `Day ${day.day}`,
-          day.inTime || '-',
-          day.outTime || '-',
-          statusLabel,
-          hasDuration ? day.duration : hoursLabel
-        ];
-      });
+      return [
+        `Day ${day.day}`,
+        day.inTime || '-',
+        day.outTime || '-',
+        statusLabel,
+        hasDuration ? day.duration : hoursLabel
+      ];
+    });
 
     if (attendanceData.length > 0) {
       autoTable(doc, {
@@ -281,7 +281,7 @@ export const generateIndividualExcel = (data) => {
  */
 export const generateIndividualCSV = (data) => {
   const { employee, summary, month, year, periodLabel } = data;
-  
+
   const lines = [
     'ATTENDANCE PERFORMANCE REPORT',
     `Period,${periodLabel || MONTH_NAMES[month - 1] + ' ' + year}`,
@@ -350,8 +350,8 @@ export const downloadReport = async (data, format = 'pdf') => {
       case 'excel':
       case 'xlsx':
         const excelResult = generateIndividualExcel(data);
-        blob = new Blob([excelResult.buffer], { 
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        blob = new Blob([excelResult.buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         });
         filename = excelResult.filename;
         break;
@@ -401,6 +401,16 @@ const formatNumber = (value, digits = 1) => {
 const formatAttendanceStatus = (record, month, year) => {
   const rawStatus = (record.status || '').toString().trim();
   const upper = rawStatus.toUpperCase();
+
+  if (upper === 'P') return 'Present';
+  if (upper === 'A') return 'Absent';
+  if (upper === 'H') return 'H';
+  if (upper === 'OH') return 'OH';
+  if (upper === 'SS') return 'SS';
+  if (upper === 'WEEKEND') return 'Weekend';
+  if (upper === 'L' || upper === 'LEAVE') return 'Leave';
+  if (upper === 'OD') return 'OD';
+
   const holidayLabel = getHolidayLabel(month, record.day, year);
   const holidayType = getHolidayType(month, record.day, year);
   const dayNumber = Number(record.day);
@@ -410,19 +420,8 @@ const formatAttendanceStatus = (record, month, year) => {
   const isCalendarHoliday = Boolean(holidayType) || Boolean(holidayLabel);
 
   if (isCalendarHoliday) {
-    return isSunday ? 'Weekend' : 'Holiday';
-  }
-
-  if (upper === 'P') return 'Present';
-  if (upper === 'A') return 'Absent';
-  if (upper === 'L') return 'Leave';
-
-  if (upper.includes('HOLIDAY') || upper.includes('SECOND SATURDAY')) {
-    return 'Holiday';
-  }
-
-  if (upper.includes('WEEKEND')) {
-    return 'Weekend';
+    if (holidayType === 'second_saturday') return 'SS';
+    return isSunday ? 'Weekend' : 'H';
   }
 
   if (rawStatus) return rawStatus;
@@ -458,7 +457,9 @@ export const buildConsolidatedReport = (attendanceData, monthNumber, year) => {
   attendanceData.forEach((employee) => {
     const { key: departmentKey, label: departmentLabel } = resolveDepartment(employee.department);
     const summary = calculateSummary(employee, month, targetYear);
-    const totalDays = summary.workingDays || summary.presentDays + summary.absentDays;
+    const presentDays = employee.finalCalculatedPresent !== undefined ? Number(employee.finalCalculatedPresent) : summary.presentDays;
+    const totalDays = Number(employee.totalWorkingDays || summary.workingDays || (presentDays + summary.absentDays)) || 22;
+    const percentage = employee.finalAttendancePercent !== undefined ? Number(employee.finalAttendancePercent) : (totalDays > 0 ? (presentDays / totalDays) * 100 : summary.attendancePercentage || 0);
 
     if (!departmentMap.has(departmentKey)) {
       departmentMap.set(departmentKey, {
@@ -472,19 +473,19 @@ export const buildConsolidatedReport = (attendanceData, monthNumber, year) => {
 
     const entry = departmentMap.get(departmentKey);
     entry.employees.push({
-      name: employee.name || 'N/A',
-      designation: employee.designation || 'N/A',
+      name: employee.name || employee.facultyName || 'N/A',
+      designation: employee.designation || 'Faculty',
       cfmsId: employee.cfmsId || employee.cfms_id || 'N/A',
       email: employee.email || '',
-      presentDays: summary.presentDays,
+      presentDays,
       totalDays,
-      totalHours: summary.totalHours || 0,
-      percentage: summary.attendancePercentage || 0
+      totalHours: summary.totalHours || (presentDays * 8.0),
+      percentage: Number(percentage.toFixed(1))
     });
 
-    entry.presentSum += summary.presentDays;
+    entry.presentSum += presentDays;
     entry.totalSum += totalDays;
-    entry.hoursSum += summary.totalHours || 0;
+    entry.hoursSum += summary.totalHours || (presentDays * 8.0);
   });
 
   const departments = Array.from(departmentMap.values()).map((dept) => {
@@ -631,7 +632,7 @@ export const generateConsolidatedPDFBase64 = (report) => {
 
 export const downloadConsolidatedPDF = (report) => {
   const doc = createConsolidatedDocument(report);
-  const filename = `consolidated_attendance_${report.year}_${report.month}.pdf`;
+  const filename = `JNTUGV_APFRS_Consolidated_Attendance_Report_${report.periodLabel.replace(' ', '_')}.pdf`;
   const blob = doc.output('blob');
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

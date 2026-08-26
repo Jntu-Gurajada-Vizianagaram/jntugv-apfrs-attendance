@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { Layers, Mail, Send, Download, AlertCircle, BarChart3, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Layers, Mail, Send, Download, AlertCircle, BarChart3, CheckCircle, Clock, XCircle, ShieldCheck, Lock } from 'lucide-react';
 import PageLayout from './PageLayout';
 import { useAttendance } from '../contexts/AttendanceContext';
+import { useAuth } from '../contexts/AuthContext';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import Card, { CardHeader, CardDescription, CardTitle } from '../components/ui/Card';
@@ -10,7 +11,7 @@ import { getActiveSMTPConfig, validateSMTPConfig } from '../store/smtpConfig';
 import { sendEmail } from '../utils/email/index';
 
 const OFFICIAL_CONSOLIDATED_RECIPIENTS = [
-  { name: 'Registrar', email: 'registar@jntugv.edu.in' },
+  { name: 'Registrar', email: 'registrar@jntugv.edu.in' },
   { name: 'Vice Chancellor', email: 'vc@jntugv.edu.in' }
 ];
 
@@ -39,6 +40,7 @@ const STATUS_META = {
 
 const ConsolidatedReport = () => {
   const { attendanceData, selectedMonth, selectedYear, hasData } = useAttendance();
+  const { canSendEmail, user } = useAuth();
   const [recipientInput, setRecipientInput] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
@@ -210,6 +212,11 @@ const ConsolidatedReport = () => {
   };
 
   const handleSend = async () => {
+    if (!canSendEmail) {
+      alert('Email dispatch is strictly reserved for IT Support and DMC Coordinator (dmc@jntugv.edu.in / dpo@jntugv.edu.in).');
+      return;
+    }
+
     if (!report.departments.length) {
       alert('Upload attendance data before sending the consolidated report.');
       return;
@@ -255,7 +262,7 @@ const ConsolidatedReport = () => {
 
     try {
       const base64Attachment = generateConsolidatedPDFBase64(report);
-      const filename = `consolidated_attendance_${report.year}_${report.month}.pdf`;
+      const filename = `JNTUGV_APFRS_Consolidated_Attendance_Report_${report.periodLabel.replace(' ', '_')}.pdf`;
       const finalSubject = derivedDefaults.subject;
       const htmlBody = buildEmailBody(derivedDefaults.message);
 
@@ -307,15 +314,15 @@ const ConsolidatedReport = () => {
   };
 
   const bodyContent = (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
             <Layers className="w-8 h-8 text-indigo-600" />
-            Consolidated Report
+            Consolidated Attendance Report
           </h1>
-          <p className="text-slate-500 mt-1">
-            Generate and email department-wise consolidated attendance for {report.periodLabel}.
+          <p className="text-slate-500 mt-1 text-xs font-medium">
+            Executive Watcher View for {report.periodLabel} with Faculty CFMS ID Tracking.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -323,22 +330,31 @@ const ConsolidatedReport = () => {
             variant="secondary"
             onClick={handleDownload}
             disabled={!hasData || isDownloading}
-            className="gap-2"
+            className="gap-2 text-xs font-bold"
           >
             <Download className="w-4 h-4" />
             {isDownloading ? 'Preparing...' : 'Download PDF'}
           </Button>
-          <Button onClick={handleSend} disabled={!hasData || isSending} className="gap-2">
-            {isSending ? (
-              <>
-                <BarChart3 className="w-4 h-4 animate-spin" /> Sending...
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4" /> Send Consolidated Email
-              </>
-            )}
-          </Button>
+
+          {/* Mail Send Button Disabled for Executives; Enabled ONLY for IT Support / DMC / DPO */}
+          {canSendEmail ? (
+            <Button onClick={handleSend} disabled={!hasData || isSending} className="gap-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700">
+              {isSending ? (
+                <>
+                  <BarChart3 className="w-4 h-4 animate-spin" /> Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" /> Send Consolidated Email (IT Support)
+                </>
+              )}
+            </Button>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-bold">
+              <Lock className="w-3.5 h-3.5 text-amber-600" />
+              <span>Email Dispatch Reserved for IT Cell (DMC / DPO)</span>
+            </div>
+          )}
         </div>
       </header>
 
@@ -353,81 +369,90 @@ const ConsolidatedReport = () => {
       ) : (
         <>
           <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500 uppercase">Departments</CardTitle>
-                <CardDescription className="text-3xl font-bold text-slate-900">{report.departments.length}</CardDescription>
+            <Card className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+              <CardHeader className="pb-2 p-0">
+                <CardTitle className="text-xs font-bold text-slate-400 uppercase">Departments</CardTitle>
+                <CardDescription className="text-3xl font-extrabold text-slate-900">{report.departments.length}</CardDescription>
               </CardHeader>
             </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500 uppercase">Faculty Covered</CardTitle>
-                <CardDescription className="text-3xl font-bold text-slate-900">{departmentTotals.faculty}</CardDescription>
+            <Card className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+              <CardHeader className="pb-2 p-0">
+                <CardTitle className="text-xs font-bold text-slate-400 uppercase">Faculty Tracked</CardTitle>
+                <CardDescription className="text-3xl font-extrabold text-slate-900">{departmentTotals.faculty}</CardDescription>
               </CardHeader>
             </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500 uppercase">Average Attendance</CardTitle>
-                <CardDescription className="text-3xl font-bold text-slate-900">{departmentTotals.percentage}%</CardDescription>
+            <Card className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+              <CardHeader className="pb-2 p-0">
+                <CardTitle className="text-xs font-bold text-slate-400 uppercase">Average Attendance</CardTitle>
+                <CardDescription className="text-3xl font-extrabold text-emerald-700">{departmentTotals.percentage}%</CardDescription>
               </CardHeader>
             </Card>
           </section>
 
           <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <Mail className="w-5 h-5 text-indigo-600" /> Email Configuration
+            <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <Mail className="w-5 h-5 text-indigo-600" /> Executive Email Dispatch Status
             </h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">Recipients</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Recipients</label>
                   <Input
                     placeholder="Enter comma or newline separated email addresses"
                     value={recipientInput}
                     onChange={(event) => setRecipientInput(event.target.value)}
+                    disabled={!canSendEmail}
                   />
-                  <p className="text-xs text-slate-400 mt-2">
-                    Separate multiple emails with commas or new lines. Registrar and Vice Chancellor are included automatically.
+                  <p className="text-xs text-slate-400 mt-1.5">
+                    Registrar (registrar@jntugv.edu.in) and Vice Chancellor (vc@jntugv.edu.in) are included automatically.
                   </p>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">Subject</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Subject</label>
                   <Input
                     value={derivedDefaults.subject}
                     onChange={(event) => setSubject(event.target.value)}
+                    disabled={!canSendEmail}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">Message</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Message</label>
                   <textarea
-                    className="w-full min-h-[150px] rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                    className="w-full min-h-[120px] rounded-xl border border-slate-300 bg-white p-3 text-xs text-slate-900 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
                     value={derivedDefaults.message}
                     onChange={(event) => setMessage(event.target.value)}
+                    disabled={!canSendEmail}
                   />
                 </div>
               </div>
-              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-5 space-y-4">
-                <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">SMTP Status</h3>
-                <p className="text-sm text-slate-600">
-                  Active account: <strong>{activeConfig?.user || 'Not configured'}</strong>
+              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-5 space-y-3 text-xs">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wide">IT Processing & Dispatch Control</h3>
+                  {canSendEmail ? (
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold">IT Authorized</span>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded font-bold">Executive Watcher View</span>
+                  )}
+                </div>
+
+                <p className="text-slate-600">
+                  Active SMTP Account: <strong>{activeConfig?.user || 'smtp.gmail.com'}</strong>
                 </p>
-                <p className="text-sm text-slate-600">
-                  From name: <strong>{activeConfig?.fromName || 'APFRS Reports'}</strong>
+                <p className="text-slate-600">
+                  From Sender: <strong>{activeConfig?.fromName || 'JNTU-GV APFRS IT Cell'}</strong>
                 </p>
-                <p className="text-sm text-slate-600">
-                  Attachment name: <strong>{`consolidated_attendance_${report.year}_${report.month}.pdf`}</strong>
+                <p className="text-slate-600">
+                  Attached Report: <strong>{`JNTUGV_APFRS_Consolidated_Attendance_Report_${report.periodLabel.replace(' ', '_')}.pdf`}</strong>
                 </p>
-                <p className="text-sm text-slate-600">
-                  Overall hours logged: <strong>{departmentTotals.hours.toFixed(1)} hrs</strong>
-                </p>
-                <div className="pt-4 space-y-3 border-t border-slate-200">
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Official Recipients</h4>
+
+                <div className="pt-3 space-y-2 border-t border-slate-200">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">Official Watcher Recipients</h4>
                   <div className="space-y-2">
                     {officialStatusList.map(renderRecipientStatus)}
                   </div>
                   {additionalStatusList.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Additional Recipients</h4>
+                    <div className="space-y-2 pt-2">
+                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">Additional Recipients</h4>
                       <div className="space-y-2">
                         {additionalStatusList.map(renderRecipientStatus)}
                       </div>
@@ -438,39 +463,41 @@ const ConsolidatedReport = () => {
             </div>
           </section>
 
+          {/* Department Tables with Faculty Name AND CFMS ID */}
           <section className="space-y-6">
             {report.departments.map((dept) => (
               <div key={dept.department} className="bg-white rounded-2xl border border-slate-200 shadow-sm">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900">{dept.department}</h3>
-                    <p className="text-sm text-slate-500">{dept.totalEmployees} faculty • {dept.presentSum}/{dept.totalSum} present • {dept.averagePercentage}% average attendance</p>
+                    <h3 className="text-base font-extrabold text-slate-900">{dept.department}</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">{dept.totalEmployees} faculty • {dept.presentSum}/{dept.totalSum} present • {dept.averagePercentage}% average attendance</p>
                   </div>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200">
-                    <thead className="bg-slate-50">
+                  <table className="min-w-full divide-y divide-slate-200 text-xs">
+                    <thead className="bg-slate-50 font-bold text-slate-600">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">S.No</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Faculty Member</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Details</th>
-                        <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Stats [P/T]</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Hours</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Percentage</th>
+                        <th className="px-4 py-3 text-left uppercase">S.No</th>
+                        <th className="px-4 py-3 text-left uppercase">Faculty Member (Name & CFMS ID)</th>
+                        <th className="px-4 py-3 text-left uppercase">Designation</th>
+                        <th className="px-4 py-3 text-center uppercase">Stats [P/T]</th>
+                        <th className="px-4 py-3 text-right uppercase">Total Hours</th>
+                        <th className="px-4 py-3 text-right uppercase">Percentage</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-slate-200">
+                    <tbody className="bg-white divide-y divide-slate-100">
                       {dept.employees.map((emp) => (
-                        <tr key={`${dept.department}-${emp.serial}-${emp.name}`}>
-                          <td className="px-4 py-3 text-sm text-slate-700">{emp.serial}</td>
-                          <td className="px-4 py-3 text-sm font-medium text-slate-900">{emp.name}</td>
-                          <td className="px-4 py-3 text-sm text-slate-600">
-                            {emp.designation}
-                            {emp.cfmsId && emp.cfmsId !== 'N/A' ? ` • ${emp.cfmsId}` : ''}
+                        <tr key={`${dept.department}-${emp.serial}-${emp.name}`} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-medium text-slate-500">{emp.serial}</td>
+                          <td className="px-4 py-3 font-extrabold text-slate-900">
+                            {emp.name} <span className="font-mono text-indigo-700 font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 ml-1.5">(CFMS: {emp.cfmsId})</span>
                           </td>
-                          <td className="px-4 py-3 text-sm text-slate-700 text-center">{emp.statsLabel}</td>
-                          <td className="px-4 py-3 text-sm text-slate-700 text-right">{emp.hoursLabel}</td>
-                          <td className="px-4 py-3 text-sm text-slate-700 text-right">{emp.percentage.toFixed(1)}%</td>
+                          <td className="px-4 py-3 text-slate-600 font-medium">
+                            {emp.designation}
+                          </td>
+                          <td className="px-4 py-3 text-center font-bold text-slate-800">{emp.statsLabel}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-slate-700">{emp.hoursLabel} hrs</td>
+                          <td className="px-4 py-3 text-right font-extrabold text-slate-900">{emp.percentage.toFixed(1)}%</td>
                         </tr>
                       ))}
                     </tbody>

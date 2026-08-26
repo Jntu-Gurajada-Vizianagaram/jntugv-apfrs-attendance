@@ -14,11 +14,10 @@
  * }
  */
 
-const EMAIL_STATUS_KEY = 'apfrs_email_status';
+const inMemoryEmailStatus = {};
 
-// Check if we're in browser
-const isBrowser = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
-const getStorage = () => (isBrowser() ? window.localStorage : null);
+const isBrowser = () => typeof window !== 'undefined';
+const getStorage = () => null;
 
 // Dispatch custom event for status updates
 const notifyStatusChange = () => {

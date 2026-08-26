@@ -18,24 +18,19 @@ const EMAIL_REPORTS_KEY = "faculty_email_reports";
 const SMTP_CONFIG_EVENT = "smtp-config-updated";
 const SMTP_MISSING_ERROR = "SMTP configuration missing. Please configure email settings first.";
 
-const getEmailReports = () => {
-  try {
-    return JSON.parse(localStorage.getItem(EMAIL_REPORTS_KEY)) || {};
-  } catch {
-    return {};
-  }
-};
+const emailReportsMemory = {};
+
+const getEmailReports = () => emailReportsMemory;
 
 const saveEmailReport = (cfmsId, email, status, message = "") => {
   try {
-    const reports = getEmailReports();
     const today = new Date().toDateString();
 
-    if (!reports[cfmsId]) {
-      reports[cfmsId] = [];
+    if (!emailReportsMemory[cfmsId]) {
+      emailReportsMemory[cfmsId] = [];
     }
 
-    reports[cfmsId].push({
+    emailReportsMemory[cfmsId].push({
       date: today,
       email,
       status,
@@ -43,18 +38,7 @@ const saveEmailReport = (cfmsId, email, status, message = "") => {
       timestamp: new Date().toISOString(),
     });
 
-    // Keep only last 30 days of reports
-    reports[cfmsId] = reports[cfmsId]
-      .filter((report) => {
-        const reportDate = new Date(report.timestamp);
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        return reportDate >= thirtyDaysAgo;
-      })
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-    localStorage.setItem(EMAIL_REPORTS_KEY, JSON.stringify(reports));
-    return reports[cfmsId];
+    return emailReportsMemory[cfmsId];
   } catch (error) {
     console.error("Error saving email report:", error);
     return [];

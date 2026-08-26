@@ -39,6 +39,7 @@ const DepartmentReport = () => {
             let totalAbsent = 0;
             let totalLeave = 0;
             let totalHours = 0;
+            let totalWorkingDaysForDept = 0;
 
             deptEmployees.forEach(emp => {
                 const summary = calculateSummary(emp, effectiveWorkingDays);
@@ -46,15 +47,15 @@ const DepartmentReport = () => {
                 totalAbsent += summary.absentDays;
                 totalLeave += summary.leaveDays;
                 totalHours += parseFloat(summary.totalHours || 0);
+                totalWorkingDaysForDept += summary.workingDays;
             });
 
-            const totalPossible = deptEmployees.length * (workingDays.length || 1);
-            const attendancePercentage = totalPossible > 0
-                ? ((totalPresent / totalPossible) * 100).toFixed(1)
+            const attendancePercentage = totalWorkingDaysForDept > 0
+                ? ((totalPresent / totalWorkingDaysForDept) * 100).toFixed(1)
                 : 0;
 
-            const avgHoursPerEmployee = deptEmployees.length > 0
-                ? (totalHours / deptEmployees.length).toFixed(1)
+            const avgHoursPerDay = totalPresent > 0
+                ? (totalHours / totalPresent).toFixed(1)
                 : 0;
 
             stats[dept] = {
@@ -64,7 +65,7 @@ const DepartmentReport = () => {
                 totalAbsent,
                 totalLeave,
                 totalHours: totalHours.toFixed(1),
-                avgHoursPerEmployee,
+                avgHoursPerDay,
                 attendancePercentage: parseFloat(attendancePercentage),
                 employees: deptEmployees.map(emp => ({
                     ...emp,
@@ -199,16 +200,16 @@ const DepartmentReport = () => {
                                         Faculty
                                     </th>
                                     <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                        Present
+                                        Present (Days)
                                     </th>
                                     <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                        Absent
+                                        Absent (Days)
                                     </th>
                                     <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">
                                         Attendance %
                                     </th>
                                     <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                        Avg Hours
+                                        Avg Hours/Day
                                     </th>
                                 </tr>
                             </thead>
@@ -240,7 +241,7 @@ const DepartmentReport = () => {
                                                     {dept.attendancePercentage}%
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-center text-slate-700">{dept.avgHoursPerEmployee}</td>
+                                            <td className="px-6 py-4 text-center text-slate-700">{dept.avgHoursPerDay}</td>
                                         </tr>
                                     ))}
                             </tbody>
@@ -265,12 +266,12 @@ const DepartmentReport = () => {
                             </div>
 
                             <div className="p-4 bg-green-50 rounded-xl">
-                                <p className="text-sm text-green-700">Present</p>
+                                <p className="text-sm text-green-700">Present Days</p>
                                 <p className="text-2xl font-bold text-green-900">{selectedDeptData.totalPresent}</p>
                             </div>
 
                             <div className="p-4 bg-red-50 rounded-xl">
-                                <p className="text-sm text-red-700">Absent</p>
+                                <p className="text-sm text-red-700">Absent Days</p>
                                 <p className="text-2xl font-bold text-red-900">{selectedDeptData.totalAbsent}</p>
                             </div>
 
@@ -280,8 +281,8 @@ const DepartmentReport = () => {
                             </div>
 
                             <div className="p-4 bg-purple-50 rounded-xl">
-                                <p className="text-sm text-purple-700">Avg Hours</p>
-                                <p className="text-2xl font-bold text-purple-900">{selectedDeptData.avgHoursPerEmployee}</p>
+                                <p className="text-sm text-purple-700">Avg Hours/Day</p>
+                                <p className="text-2xl font-bold text-purple-900">{selectedDeptData.avgHoursPerDay}</p>
                             </div>
                         </div>
                     </div>
@@ -297,17 +298,17 @@ const DepartmentReport = () => {
                                     <tr>
                                         <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Name</th>
                                         <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Designation</th>
-                                        <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Present</th>
-                                        <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Absent</th>
+                                        <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Present (Days)</th>
+                                        <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Absent (Days)</th>
                                         <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Attendance %</th>
-                                        <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Hours</th>
+                                        <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Avg Hrs/Day</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {selectedDeptData.employees
                                         .sort((a, b) => parseFloat(b.summary.attendancePercentage) - parseFloat(a.summary.attendancePercentage))
-                                        .map((emp) => (
-                                            <tr key={emp.cfmsId} className="hover:bg-slate-50">
+                                        .map((emp, index) => (
+                                            <tr key={`${emp.cfmsId}-${index}`} className="hover:bg-slate-50">
                                                 <td className="px-6 py-4">
                                                     <div className="font-medium text-slate-900">{emp.name}</div>
                                                     <div className="text-sm text-slate-500">{emp.cfmsId}</div>
@@ -329,7 +330,7 @@ const DepartmentReport = () => {
                                                         {emp.summary.attendancePercentage}%
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 text-center text-slate-700">{emp.summary.totalHours}</td>
+                                                <td className="px-6 py-4 text-center text-slate-700">{emp.summary.averageHoursPerDay}</td>
                                             </tr>
                                         ))}
                                 </tbody>

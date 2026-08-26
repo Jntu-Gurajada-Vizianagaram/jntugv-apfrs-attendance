@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { Clock, Calendar } from "lucide-react";
 import StatsCards from './StatsCards';
+import { useAttendance } from '../../contexts/AttendanceContext';
 
 const ReportOverview = ({
   periodStats,
@@ -17,8 +18,76 @@ const ReportOverview = ({
 
   const monthLabel = `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`;
 
+  const { reportsPublished, setReportsPublished } = useAttendance();
+  const [publishing, setPublishing] = useState(false);
+
+  const handlePublishToggle = async (publish) => {
+    setPublishing(true);
+    try {
+      const res = await fetch('/api/reports/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPublished: publish })
+      });
+      if (res.ok) {
+        setReportsPublished(publish);
+        if (publish) {
+          alert("Success! Reports are now visible to Faculty and Executives.\n\n(Simulated: Emails have also been dispatched to all faculty members.)");
+        } else {
+          alert("Reports are now hidden from Faculty and Executives.");
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update publish status.');
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* IT SUPPORT PUBLISH DASHBOARD */}
+      <div className="bg-indigo-900 rounded-2xl border border-indigo-700 p-6 shadow-xl text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-indigo-500 rounded-full blur-3xl opacity-30 pointer-events-none"></div>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h2 className="text-xl font-black flex items-center gap-2">
+              <span className="p-2 bg-indigo-800 rounded-lg">🚀</span> Dispatch & Publish Control
+            </h2>
+            <p className="text-indigo-200 text-sm mt-1 max-w-xl">
+              Currently, faculty and executives <strong className="text-white underline">cannot see</strong> these reports. 
+              Click below to instantly publish the {monthLabel} reports to their dashboards and dispatch emails.
+            </p>
+          </div>
+          
+          <div className="shrink-0 flex items-center gap-3">
+            {reportsPublished ? (
+              <button 
+                onClick={() => handlePublishToggle(false)}
+                disabled={publishing}
+                className="px-6 py-3 rounded-xl font-bold text-sm bg-rose-500/20 text-rose-200 hover:bg-rose-500 hover:text-white border border-rose-500/30 transition-all"
+              >
+                {publishing ? 'Updating...' : 'Unpublish Reports'}
+              </button>
+            ) : (
+              <button 
+                onClick={() => handlePublishToggle(true)}
+                disabled={publishing}
+                className="px-6 py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white shadow-lg shadow-emerald-500/30 transition-all transform hover:-translate-y-0.5 flex items-center gap-2"
+              >
+                <span>Publish & Dispatch Emails</span>
+              </button>
+            )}
+          </div>
+        </div>
+        
+        {reportsPublished && (
+          <div className="mt-4 p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-emerald-200 text-xs font-bold flex items-center gap-2">
+            ✅ Reports are currently LIVE and visible to all faculty and executives.
+          </div>
+        )}
+      </div>
       {/* Working days section */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-center gap-3 mb-6">

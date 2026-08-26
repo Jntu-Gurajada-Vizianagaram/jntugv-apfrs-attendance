@@ -1,7 +1,9 @@
-/* eslint-disable no-unused-vars */
 /* eslint-disable react-refresh/only-export-components */
+/* eslint-disable no-unused-vars */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { handleExcelUpload } from '../core/attendance/processor';
+import { processFinalizedAttendance } from '../utils/attendanceCalculator';
+import { persons } from '../utils/data/faculty';
 
 const AttendanceContext = createContext();
 
@@ -15,51 +17,91 @@ export const useAttendance = () => {
 
 export const AttendanceProvider = ({ children }) => {
   const [attendanceData, setAttendanceData] = useState([]);
+  const [approvedLeaves, setApprovedLeaves] = useState([]);
   const [fileName, setFileName] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState(11); // Default to Nov (11) if not set
+  const [selectedMonth, setSelectedMonth] = useState(1); // Default to Jan (1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [ready, setReady] = useState(false);
+  const [reportsPublished, setReportsPublished] = useState(false);
 
-  const [customHolidays, setCustomHolidays] = useState({}); // { "month-day": "holiday" }
+  const [customHolidays, setCustomHolidays] = useState({});
 
-  // Load data from localStorage on mount
+  // 1. Fetch Approved Leaves from Backend API
+  const fetchApprovedLeaves = async () => {
+    try {
+      const res = await fetch('/api/leaves/pending-approvals');
+      if (res.ok) {
+        const data = await res.json();
+        setApprovedLeaves(data.leaves || []);
+        return data.leaves || [];
+      }
+    } catch (err) {
+      console.warn('AttendanceContext: Could not fetch leaves from backend:', err.message);
+    }
+    return [];
+  };
+
+  // 2. Fetch Reports Status
+  const fetchReportsStatus = async () => {
+    try {
+      const res = await fetch('/api/reports/status');
+      if (res.ok) {
+        const data = await res.json();
+        setReportsPublished(data.isPublished);
+      }
+    } catch (err) {
+      console.warn('Could not fetch reports status', err);
+    }
+  };
+
+  // 3. Initialize dataset
   useEffect(() => {
-    const loadSavedData = () => {
+    const initializeDataset = async () => {
+      setLoading(true);
+      await fetchReportsStatus();
+      const leaves = await fetchApprovedLeaves();
+
       try {
-        const saved = localStorage.getItem('apfrsAttendanceReport');
-        const savedMonth = localStorage.getItem('apfrsSelectedMonth');
-        const savedYear = localStorage.getItem('apfrsSelectedYear');
-        const savedHolidays = localStorage.getItem('apfrsCustomHolidays');
+        const savedData = localStorage.getItem('apfrs_attendance_data');
+        const savedFileName = localStorage.getItem('apfrs_filename');
+        const savedMonth = localStorage.getItem('apfrs_month');
+        const savedYear = localStorage.getItem('apfrs_year');
 
-        if (saved) {
-          const parsedData = JSON.parse(saved);
-          console.log('📊 Loaded saved attendance data:', parsedData);
-          setAttendanceData(Array.isArray(parsedData) ? parsedData : []);
-        }
-
-        if (savedMonth) {
-          setSelectedMonth(parseInt(savedMonth, 10));
-        }
-
-        if (savedYear) {
-          setSelectedYear(parseInt(savedYear, 10));
-        }
-
-        if (savedHolidays) {
-          setCustomHolidays(JSON.parse(savedHolidays));
+        if (savedData && savedFileName) {
+          const parsedData = JSON.parse(savedData);
+          setFileName(savedFileName);
+          if (savedMonth) setSelectedMonth(Number(savedMonth));
+          if (savedYear) setSelectedYear(Number(savedYear));
+          
+          // Re-merge with current leaves to ensure they are up to date
+          const finalized = processFinalizedAttendance(parsedData, leaves);
+          setAttendanceData(finalized);
+          setLoading(false);
+          setReady(true);
+          return;
         }
       } catch (err) {
-        console.error('Error loading saved attendance data:', err);
-        setAttendanceData([]);
-      } finally {
-        setReady(true);
+        console.warn('Error loading attendance from localStorage:', err);
       }
+
+      // No fallback data; just start with an empty dataset
+      setAttendanceData([]);
+      setLoading(false);
+      setReady(true);
     };
 
-    loadSavedData();
+    initializeDataset();
   }, []);
+
+  const refreshLeaves = async () => {
+    const leaves = await fetchApprovedLeaves();
+    if (attendanceData && attendanceData.length > 0) {
+      const updated = processFinalizedAttendance(attendanceData, leaves);
+      setAttendanceData(updated);
+    }
+  };
 
   const handleFileUpload = async (file, rawData, month, year) => {
     if (!file || !rawData) {
@@ -72,29 +114,32 @@ export const AttendanceProvider = ({ children }) => {
 
     try {
       console.log('📤 Processing uploaded file:', file.name, 'Month:', month);
-      // Resolve month and year: Use selection if provided, otherwise fallback to detection from filename
-      let monthNum = month || 11;
+      let monthNum = month || 1;
       let yearNum = year || new Date().getFullYear();
 
-      // Process the Excel data
+      // Process raw Excel data
       const processedData = handleExcelUpload(rawData, file.name, monthNum, yearNum);
 
       if (!processedData || !Array.isArray(processedData) || processedData.length === 0) {
         throw new Error('No valid attendance data found in the file');
       }
 
-      // Update state
-      setAttendanceData(processedData);
+      // Merge with current approved leaves
+      const leaves = await fetchApprovedLeaves();
+      const finalized = processFinalizedAttendance(processedData, leaves);
+
+      setAttendanceData(finalized);
       setFileName(file.name);
       setSelectedMonth(monthNum);
       setSelectedYear(yearNum);
 
-      // Store in localStorage for persistence
-      localStorage.setItem('apfrsAttendanceReport', JSON.stringify(processedData));
-      localStorage.setItem('apfrsSelectedMonth', monthNum.toString());
-      localStorage.setItem('apfrsSelectedYear', yearNum.toString());
+      // Save to localStorage so it survives page refresh
+      localStorage.setItem('apfrs_attendance_data', JSON.stringify(processedData));
+      localStorage.setItem('apfrs_filename', file.name);
+      localStorage.setItem('apfrs_month', String(monthNum));
+      localStorage.setItem('apfrs_year', String(yearNum));
 
-      console.log(`💾 Data saved. Month resolved to: ${monthNum}`);
+      console.log(`📊 Attendance data processed & merged with leaves. Count: ${finalized.length}`);
       return true;
 
     } catch (err) {
@@ -108,7 +153,7 @@ export const AttendanceProvider = ({ children }) => {
 
   const toggleHoliday = (monthIndex, day) => {
     setCustomHolidays(prev => {
-      const key = `${monthIndex + 1}-${day}`; // storing as 1-based month for consistency with backend map
+      const key = `${monthIndex + 1}-${day}`;
       const newHolidays = { ...prev };
 
       if (newHolidays[key]) {
@@ -117,7 +162,6 @@ export const AttendanceProvider = ({ children }) => {
         newHolidays[key] = 'holiday';
       }
 
-      localStorage.setItem('apfrsCustomHolidays', JSON.stringify(newHolidays));
       return newHolidays;
     });
   };
@@ -125,19 +169,20 @@ export const AttendanceProvider = ({ children }) => {
   const resetData = () => {
     setAttendanceData([]);
     setFileName('');
-    setSelectedMonth(11); // Reset to default
+    setSelectedMonth(1);
     setSelectedYear(new Date().getFullYear());
     setError(null);
     setCustomHolidays({});
-    localStorage.removeItem('apfrsAttendanceReport');
-    localStorage.removeItem('apfrsSelectedMonth');
-    localStorage.removeItem('apfrsSelectedYear');
-    localStorage.removeItem('apfrsCustomHolidays');
+    localStorage.removeItem('apfrs_attendance_data');
+    localStorage.removeItem('apfrs_filename');
+    localStorage.removeItem('apfrs_month');
+    localStorage.removeItem('apfrs_year');
     console.log('🗑️ Attendance data reset');
   };
 
   const value = {
     attendanceData,
+    approvedLeaves,
     fileName,
     selectedMonth,
     selectedYear,
@@ -145,8 +190,12 @@ export const AttendanceProvider = ({ children }) => {
     loading,
     error,
     ready,
+    reportsPublished,
+    setReportsPublished, // allow toggle from UI
+    fetchReportsStatus,
     hasData: attendanceData.length > 0,
     handleFileUpload,
+    refreshLeaves,
     resetData,
     toggleHoliday
   };
@@ -158,5 +207,4 @@ export const AttendanceProvider = ({ children }) => {
   );
 };
 
-// export default AttendanceContext;
-// Removed default export to fix Vite HMR incompatibility with non-component default exports.
+export default AttendanceProvider;

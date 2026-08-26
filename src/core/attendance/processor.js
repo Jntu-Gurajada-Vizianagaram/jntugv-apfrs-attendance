@@ -1,4 +1,5 @@
 import { persons } from '../../utils/data/faculty';
+import { isStaffOnDuty } from '../../utils/data/leaves';
 import { parseDurationToHours, estimateHoursFromTimes } from '../calendar/dateUtils';
 import { calculateSummary, calculateOverallStats, calculateMonthlyStats } from './calculations';
 import { detectMonthFromFileName } from '../../utils/export/file';
@@ -35,8 +36,9 @@ const findDayColumns = (headerRow, dayPrefix) => {
 
   for (let i = 0; i < headerRow.length; i++) {
     const cell = headerRow[i]?.toString() || '';
+    const dayPattern = new RegExp(`^${dayPrefix}[^0-9]`);
     if (
-      cell.startsWith(dayPrefix + ' ') ||
+      dayPattern.test(cell) ||
       cell.startsWith(dayPrefix + 'In') ||
       cell.startsWith(dayPrefix + 'Out') ||
       cell.startsWith(dayPrefix + 'Status') ||
@@ -52,14 +54,20 @@ const findDayColumns = (headerRow, dayPrefix) => {
 const detectDaysInMonth = (headerRow) => {
   if (!headerRow || !Array.isArray(headerRow)) return 31;
   let maxDay = 0;
-  const dayPattern = /^(\d{2})\s/;
+  // Match "01 ", "01-", "01/" etc at the start
+  const dayPattern = /^(\d{2})[^0-9]/;
 
   headerRow.forEach((cell) => {
     const cellStr = cell?.toString() || '';
     const match = cellStr.match(dayPattern);
     if (match) {
       const dayNum = parseInt(match[1], 10);
-      if (dayNum > maxDay) {
+      if (dayNum > maxDay && dayNum <= 31) {
+        maxDay = dayNum;
+      }
+    } else if (/^\d{2}$/.test(cellStr)) {
+      const dayNum = parseInt(cellStr, 10);
+      if (dayNum > maxDay && dayNum <= 31) {
         maxDay = dayNum;
       }
     }
@@ -162,6 +170,19 @@ export const processAttendanceData = (rawData, monthNumber = null, year = new Da
       const holidayLabel = getHolidayLabel(actualMonth, day, year);
       const holidayType = getHolidayType(actualMonth, day, year);
 
+      const dateObj = new Date(year, actualMonth - 1, day);
+      const isSunday = dateObj.getDay() === 0;
+      let isSecondSaturday = false;
+      if (dateObj.getDay() === 6) {
+        let saturdayCount = 0;
+        for (let d = 1; d <= day; d++) {
+          if (new Date(year, actualMonth - 1, d).getDay() === 6) {
+            saturdayCount++;
+          }
+        }
+        isSecondSaturday = saturdayCount === 2;
+      }
+
       if (baseCol !== -1 && baseCol + 3 < row.length) {
         const inTime = formatTime(row[baseCol]);
         const outTime = formatTime(row[baseCol + 1]);
@@ -170,27 +191,60 @@ export const processAttendanceData = (rawData, monthNumber = null, year = new Da
 
         // Determine final status based on calendar configuration
         let finalStatus;
-        if (holidayLabel) {
+        if (holidayType === 'general' || holidayType === 'public') {
+          finalStatus = 'H';
+        } else if (isSunday || isSecondSaturday) {
+          const rawUpper = rawStatus.toUpperCase();
+          if (rawUpper === 'P' || rawUpper === 'PRESENT') {
+            finalStatus = 'P';
+          } else {
+            finalStatus = isSunday ? 'Weekend' : 'SS';
+          }
+        } else if (holidayType === 'optional') {
+          let allAbsent = true;
+          for (let r = 1; r < rawData.length; r++) {
+            const checkRow = rawData[r];
+            if (!checkRow || checkRow.length <= baseCol + 2) continue;
+            if (!checkRow[0] && !checkRow[2]) continue;
+            const checkStatus = (checkRow[baseCol + 2] || '').toString().trim();
+            const checkUpper = checkStatus.toUpperCase();
+            if (checkUpper === 'P' || checkUpper === 'PRESENT') {
+              allAbsent = false;
+              break;
+            }
+          }
+          const rawUpper = rawStatus.toUpperCase();
+          if (allAbsent && (rawUpper === 'A' || rawUpper === 'ABSENT' || !rawStatus)) {
+            finalStatus = 'OH';
+          } else {
+            finalStatus = (rawUpper === 'P' || rawUpper === 'PRESENT' || rawUpper === 'A' || rawUpper === 'ABSENT') ? rawStatus : holidayLabel;
+          }
+        } else if (holidayLabel) {
           // If it's a holiday/weekend/second Saturday, check if they actually attended
-          if (rawStatus === 'P') {
+          const rawUpper = rawStatus.toUpperCase();
+          if (rawUpper === 'P' || rawUpper === 'PRESENT') {
             // They came to work on a holiday - mark as Present
             finalStatus = 'P';
-          } else if (rawStatus === 'A') {
-            // They were marked absent on a holiday (unusual but possible)
-            finalStatus = 'A';
           } else {
             // No attendance data - show the holiday label
             if (holidayType === 'sunday') {
               finalStatus = 'Weekend';
             } else if (holidayType === 'second_saturday') {
-              finalStatus = 'Second Saturday';
+              finalStatus = 'SS';
             } else {
               finalStatus = holidayLabel; // e.g., "Republic Day", "Diwali"
             }
           }
         } else {
-          // On working days, only allow P or A
-          finalStatus = (rawStatus === 'P' || rawStatus === 'A') ? rawStatus : '';
+          // On working days, only allow P, A or OD
+          const upperStatus = rawStatus.toUpperCase();
+          if (upperStatus === 'P' || upperStatus === 'PRESENT') {
+            finalStatus = 'P';
+          } else if (isStaffOnDuty(cfmsId, year, actualMonth, day)) {
+            finalStatus = 'OD';
+          } else {
+            finalStatus = (upperStatus === 'A' || upperStatus === 'ABSENT') ? 'A' : '';
+          }
         }
 
         let hours = 0;

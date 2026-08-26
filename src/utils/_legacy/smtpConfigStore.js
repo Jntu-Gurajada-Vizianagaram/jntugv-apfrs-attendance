@@ -4,8 +4,8 @@ const LEGACY_SMTP_KEY = 'smtpConfig';
 const DEFAULT_SUBJECT = 'APFRS Attendance Report';
 const DEFAULT_FROM_NAME = 'APFRS Reports';
 
-const isBrowser = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
-const getStorage = () => (isBrowser() ? window.localStorage : null);
+const isBrowser = () => typeof window !== 'undefined';
+const getStorage = () => null;
 
 const createConfigId = () => `smtp_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 

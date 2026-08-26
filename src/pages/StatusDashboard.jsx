@@ -101,7 +101,7 @@ const StatusDashboard = () => {
 
   const periodKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
 
-  // Load email statuses from localStorage
+  // Load email statuses from memory store
   const loadEmailStatuses = useCallback(() => {
     const store = getEmailStatusStore();
     setEmailStatuses(store);
@@ -110,13 +110,10 @@ const StatusDashboard = () => {
   useEffect(() => {
     loadEmailStatuses();
 
-    // Listen for storage changes
     const handleStorageChange = () => loadEmailStatuses();
-    window.addEventListener('storage', handleStorageChange);
     window.addEventListener('email-status-updated', handleStorageChange);
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('email-status-updated', handleStorageChange);
     };
   }, [loadEmailStatuses]);

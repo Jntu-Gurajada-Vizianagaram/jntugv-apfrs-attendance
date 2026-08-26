@@ -1,11 +1,8 @@
-const SMTP_CONFIGS_KEY = 'smtpConfigs';
-const SMTP_ACTIVE_CONFIG_KEY = 'smtpActiveConfigId';
-const LEGACY_SMTP_KEY = 'smtpConfig';
-const DEFAULT_SUBJECT = 'APFRS Attendance Report';
-const DEFAULT_FROM_NAME = 'APFRS Reports';
+const DEFAULT_SUBJECT = 'JNTU-GV APFRS - Attendance Report';
+const DEFAULT_FROM_NAME = 'JNTU-GV APFRS Reports';
 
-const isBrowser = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
-const getStorage = () => (isBrowser() ? window.localStorage : null);
+const isBrowser = () => typeof window !== 'undefined';
+const getStorage = () => null;
 
 const createConfigId = () => `smtp_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
@@ -268,6 +265,14 @@ export const saveSMTPConfigEntry = (config) => {
   }));
 
   persistState(updatedConfigs, nextActiveId);
+
+  // Sync securely with central API backend server database
+  fetch('/api/smtp-config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(savedConfig)
+  }).catch(err => console.warn('Backend API sync warn:', err));
+
   return savedConfig;
 };
 
@@ -282,6 +287,10 @@ export const deleteSMTPConfigEntry = (id) => {
 
   const updated = filtered.map((cfg) => ({ ...cfg, isActive: cfg.id === nextActiveId }));
   persistState(updated, nextActiveId);
+
+  // Sync delete with central API backend server database
+  fetch(`/api/smtp-config/${id}`, { method: 'DELETE' }).catch(err => console.warn('Backend API sync warn:', err));
+
   return updated;
 };
 
@@ -291,6 +300,14 @@ export const setActiveSMTPConfig = (id) => {
   if (!target) return null;
   const updated = configs.map((cfg) => ({ ...cfg, isActive: cfg.id === id }));
   persistState(updated, id);
+
+  // Sync active selection with central API backend server database
+  fetch('/api/smtp-config/active', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id })
+  }).catch(err => console.warn('Backend API sync warn:', err));
+
   return target;
 };
 
@@ -374,8 +391,8 @@ export const createSMTPEmailPayload = (config, emailData) => {
         user: config.user,
         pass: config.pass
       },
-      companyName: config.fromName || 'APFRS',
-      systemName: config.fromName || 'Attendance System'
+      companyName: config.fromName || 'JNTU-GV APFRS',
+      systemName: config.fromName || 'JNTU-GV Attendance System'
     },
     emailData: {
       from: {

@@ -19,24 +19,7 @@ const getPerformanceColor = (percentage) => {
   return { bg: '#fef2f2', border: '#ef4444', text: '#dc2626' };
 };
 
-/**
- * Get performance remark based on attendance percentage
- */
-const getPerformanceRemark = (percentage, name) => {
-  const pct = parseFloat(percentage) || 0;
-  const firstName = name?.split(' ')[0] || 'The employee';
 
-  if (pct >= 90) {
-    return `Excellent performance! ${firstName} has maintained outstanding attendance this month.`;
-  }
-  if (pct >= 75) {
-    return `Good performance. ${firstName} has maintained satisfactory attendance levels.`;
-  }
-  if (pct >= 50) {
-    return `Average attendance. ${firstName} is encouraged to improve attendance for better performance.`;
-  }
-  return `Attention required. ${firstName}'s attendance needs significant improvement.`;
-};
 
 /**
  * Generate HTML email content for an attendance report
@@ -134,15 +117,16 @@ export const generateEmailHTML = (employee, summary, config, periodLabel) => {
                   <!-- Present Days -->
                   <td width="33%" style="padding: 8px;">
                     <div style="background: #ecfdf5; border: 1px solid #10b981; border-radius: 12px; padding: 16px; text-align: center;">
-                      <div style="font-size: 28px; font-weight: 800; color: #059669;">${summary.presentDays || 0}</div>
-                      <div style="font-size: 11px; color: #047857; text-transform: uppercase; font-weight: 600; margin-top: 4px;">Present Days</div>
+                      <div style="font-size: 28px; font-weight: 800; color: #059669;">${employee.finalCalculatedPresent || summary.presentDays || 0}</div>
+                      <div style="font-size: 11px; color: #047857; text-transform: uppercase; font-weight: 600; margin-top: 4px;">Final Present Days</div>
+                      <div style="font-size: 10px; color: #059669; margin-top: 2px;">(Biometric: ${employee.rawBiometricPresent || 0})</div>
                     </div>
                   </td>
                   <!-- Absent Days -->
                   <td width="33%" style="padding: 8px;">
                     <div style="background: #fef2f2; border: 1px solid #ef4444; border-radius: 12px; padding: 16px; text-align: center;">
-                      <div style="font-size: 28px; font-weight: 800; color: #dc2626;">${summary.absentDays || 0}</div>
-                      <div style="font-size: 11px; color: #b91c1c; text-transform: uppercase; font-weight: 600; margin-top: 4px;">Absent Days</div>
+                      <div style="font-size: 28px; font-weight: 800; color: #dc2626;">${employee.unapprovedAbsences !== undefined ? employee.unapprovedAbsences : (summary.absentDays || 0)}</div>
+                      <div style="font-size: 11px; color: #b91c1c; text-transform: uppercase; font-weight: 600; margin-top: 4px;">Unapproved Absences</div>
                     </div>
                   </td>
                 </tr>
@@ -155,7 +139,7 @@ export const generateEmailHTML = (employee, summary, config, periodLabel) => {
             <td style="padding: 0 32px 32px;">
               <div style="background: ${colors.bg}; border: 2px solid ${colors.border}; border-radius: 16px; padding: 24px; text-align: center;">
                 <div style="font-size: 48px; font-weight: 800; color: ${colors.text};">
-                  ${summary.attendancePercentage || 0}%
+                  ${summary.attendancePercentage || employee.finalAttendancePercent || 0}%
                 </div>
                 <div style="font-size: 14px; color: ${colors.text}; font-weight: 600; margin-top: 8px;">
                   Overall Attendance Rate
@@ -163,6 +147,41 @@ export const generateEmailHTML = (employee, summary, config, periodLabel) => {
               </div>
             </td>
           </tr>
+          
+          <!-- Duty Credits & Leaves -->
+          ${(employee.dutyCreditDays > 0 || employee.approvedLeaveDays > 0) ? `
+          <tr>
+            <td style="padding: 0 32px 32px;">
+              <h2 style="margin: 0 0 16px; color: #1e293b; font-size: 18px; font-weight: 700;">
+                ✨ Approved Leaves & Duty Credits
+              </h2>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
+                ${employee.dutyCreditDays > 0 ? `
+                <tr>
+                  <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; background-color: #ecfdf5;">
+                    <span style="color: #047857; font-size: 13px; font-weight: 700;">Duty Credits (Counted as Present)</span>
+                    <span style="float: right; color: #047857; font-weight: 800;">+${employee.dutyCreditDays} days</span>
+                    <div style="font-size: 11px; color: #059669; margin-top: 4px;">
+                      OD: ${employee.odDays || 0} | AL: ${employee.alDays || 0}
+                    </div>
+                  </td>
+                </tr>
+                ` : ''}
+                ${employee.approvedLeaveDays > 0 ? `
+                <tr>
+                  <td style="padding: 16px; ${employee.dutyCreditDays > 0 ? '' : 'border-bottom: 1px solid #e2e8f0;'} background-color: #fffbeb;">
+                    <span style="color: #d97706; font-size: 13px; font-weight: 700;">Approved Leaves (CL, SL, EL)</span>
+                    <span style="float: right; color: #d97706; font-weight: 800;">${employee.approvedLeaveDays} days</span>
+                    <div style="font-size: 11px; color: #b45309; margin-top: 4px;">
+                      CL: ${employee.clDays || 0} | SL: ${employee.slDays || 0} | EL: ${employee.elDays || 0}
+                    </div>
+                  </td>
+                </tr>
+                ` : ''}
+              </table>
+            </td>
+          </tr>
+          ` : ''}
           
           <!-- Additional Stats -->
           <tr>
@@ -250,14 +269,24 @@ Email: ${employee.email || 'N/A'}
 
 ATTENDANCE SUMMARY
 ------------------
-Present Days: ${summary.presentDays || 0}
-Absent Days: ${summary.absentDays || 0}
+Final Present Days: ${employee.finalCalculatedPresent || summary.presentDays || 0} (Raw Biometric: ${employee.rawBiometricPresent || 0})
+Unapproved Absences: ${employee.unapprovedAbsences !== undefined ? employee.unapprovedAbsences : (summary.absentDays || 0)}
 
+${(employee.dutyCreditDays > 0 || employee.approvedLeaveDays > 0) ? `APPROVED LEAVES & DUTY CREDITS
+------------------------------
+${employee.dutyCreditDays > 0 ? `Duty Credits (Counted as Present): +${employee.dutyCreditDays} days
+- OD: ${employee.odDays || 0}
+- AL: ${employee.alDays || 0}` : ''}
+${employee.approvedLeaveDays > 0 ? `Approved Leaves (Counted as Leaves): ${employee.approvedLeaveDays} days
+- CL: ${employee.clDays || 0}
+- SL: ${employee.slDays || 0}
+- EL: ${employee.elDays || 0}` : ''}
+` : ''}
 Working Days: ${summary.workingDays || 0}
 Total Hours: ${summary.totalHours || 0} hrs
 Holidays: ${summary.holidays || 0}
 
-ATTENDANCE RATE: ${summary.attendancePercentage || 0}%
+ATTENDANCE RATE: ${summary.attendancePercentage || employee.finalAttendancePercent || 0}%
 
 
 

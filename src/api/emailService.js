@@ -10,7 +10,7 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // Try local backend first, then fallback to external API
 const getEmailApiUrl = () => {
   // Check if local backend is available
-  const localBackend = 'http://localhost:8001/api';
+  const localBackend = '/api';
   const externalApi = import.meta.env.VITE_EMAIL_API_URL || 'https://api.apfrs.jntugv.in/api';
 
   // We'll try local first in the send function
@@ -188,7 +188,7 @@ export const sendIndividualReport = async (employee, configOverride = null, mont
   }
 
   const reportId = `${employee.cfmsId || 'EMP'}-${Date.now().toString(36).toUpperCase()}`;
-  const subject = `${config?.subject || 'APFRS Attendance Report'} - ${periodLabel}`;
+  const subject = `${config?.subject || 'JNTU-GV  - APFRS Attendance Report'} - ${periodLabel}`;
 
   try {
     const result = await sendEmail({
