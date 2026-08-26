@@ -38,10 +38,11 @@ jobs:
       - name: Deploy to Production Server
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: "72.61.232.85"
-          username: jntugv-apfrs
-          password: "APFRS@#2026"
-          port: 22
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
             cd /home/jntugv-apfrs/htdocs/apfrs.jntugv.in
             git pull origin main
