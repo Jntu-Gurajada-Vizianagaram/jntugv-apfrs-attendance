@@ -206,7 +206,10 @@ const getStoredUsers = () => {
     }
   ];
 
-  const departments = ['Administration', 'BS&HSS', 'CE', 'CSE', 'Chemistry', 'Commerce', 'ECE', 'EEE', 'IT', 'ME', 'MET', 'Physics'];
+  // HOD accounts are only generated for these departments. 
+  // Chemistry, Commerce, Physics, and Maths are mapped to BS&HSS.
+  // Administration is mapped to the Registrar.
+  const departments = ['BS&HSS', 'CE', 'CSE', 'ECE', 'EEE', 'IT', 'ME', 'MET'];
   const hodAccounts = departments.map(dept => ({
       id: `usr_hod_${dept.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
       email: `hod.${dept.toLowerCase().replace(/[^a-z0-9]/g, '')}@jntugvcev.edu.in`,
@@ -624,13 +627,28 @@ app.get('/api/leaves/pending-approvals', (req, res) => {
   let pendingLeaves = [];
   if (role === 'HOD') {
       // HOD sees PENDING_HOD for their specific department
-      pendingLeaves = leaves.filter(l => l.status === 'PENDING_HOD' && (!department || l.department === department));
+      // Special routing: BS&HSS HOD sees leaves from allied departments
+      const bshssAlliedDepts = ['BS&HSS', 'Chemistry', 'Commerce', 'Physics', 'Maths', 'Mathematics'];
+      
+      pendingLeaves = leaves.filter(l => {
+        if (l.status !== 'PENDING_HOD') return false;
+        if (!department) return true; // (if department wasn't passed, though it should be)
+        if (department === 'BS&HSS' && bshssAlliedDepts.includes(l.department)) return true;
+        return l.department === department;
+      });
   } else if (role === 'Principal') {
       // Principal sees PENDING_PRINCIPAL across all departments
       pendingLeaves = leaves.filter(l => l.status === 'PENDING_PRINCIPAL');
   } else if (role === 'Registrar') {
       // Registrar sees PENDING_REGISTRAR across all departments
-      pendingLeaves = leaves.filter(l => l.status === 'PENDING_REGISTRAR');
+      // Special routing: Registrar acts as HOD for Administration
+      pendingLeaves = leaves.filter(l => 
+          l.status === 'PENDING_REGISTRAR' || 
+          (l.status === 'PENDING_HOD' && l.department === 'Administration')
+      );
+  } else if (role === 'VC') {
+      // VC sees PENDING_VC
+      pendingLeaves = leaves.filter(l => l.status === 'PENDING_VC');
   } else {
       // Admin sees everything
       pendingLeaves = leaves;
