@@ -43,7 +43,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
-            cd /path/to/your/app
+            cd 
             git pull origin main
             npm install
             npm run build
