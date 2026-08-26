@@ -44,17 +44,16 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
-            cd /home/jntugv-apfrs/htdocs/apfrs.jntugv.in
+            # Navigate to the correct subfolder based on your shell prompt
+            cd /home/jntugv-apfrs/htdocs/apfrs.jntugv.in/jntugv-apfrs-attendance
             git pull origin main
             
-            # Build frontend (dist folder will be served by backend)
+            # Build and start frontend on port 5174 (for Nginx)
             npm install
             npm run build
+            pm2 restart apfrs-frontend || pm2 start npm --name "apfrs-frontend" -- run preview -- --port 5174
             
-            # Clean up the old separate frontend PM2 process if it exists
-            pm2 delete apfrs-frontend || true
-            
-            # Start backend (which now also serves the frontend on port 8001)
+            # Start backend on port 8001
             cd backend
             npm install
             PORT=8001 pm2 restart apfrs-backend || PORT=8001 pm2 start server.js --name "apfrs-backend"
